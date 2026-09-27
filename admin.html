@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Restaurant Staff Dashboard</title>
+<style>
+:root{--green:#25d366;--green2:#8cff5b;--bg:#07100a;--panel:#101812;--line:#263329;--text:#fff7e6;--muted:#aab4ab;--red:#e53935;--gold:#f6c453}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#030604,#07100a);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif}button,input{font:inherit}button{cursor:pointer}.wrap{width:min(1100px,94%);margin:auto}.hidden{display:none!important}.login{min-height:100vh;display:grid;place-items:center;padding:20px}.card{background:rgba(16,24,18,.96);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:0 20px 60px #0008}.login-card{width:min(430px,100%)}h1,h2{margin-top:0}.logo{color:var(--gold);font-weight:900;letter-spacing:.04em}.field{margin:14px 0}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}.field input,.edit input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:#07100a;color:#fff}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:800}.primary{background:var(--green);color:#041008}.secondary{background:#172119;color:#fff;border:1px solid var(--line)}.danger{background:#4b1717;color:#fff}.error{color:#ff8f8f;font-size:13px;min-height:20px}.top{position:sticky;top:0;z-index:10;background:#050906ee;border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}.topin{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:15px}.sub{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:1fr 1.6fr;gap:18px;margin:20px 0}.section{padding:20px}.section h2{font-size:19px}.menu{display:grid;gap:12px}.item{border:1px solid var(--line);border-radius:14px;padding:14px;background:#0b130e}.itemhead{display:flex;justify-content:space-between;gap:10px}.itemname{font-weight:900}.badge{font-size:11px;border-radius:999px;padding:5px 8px;background:#17351f;color:var(--green2)}.badge.off{background:#3b1b1b;color:#ff9c9c}.prices{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.edit input{padding:9px}.actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.search{margin-bottom:12px}.search input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#07100a;color:#fff}.info-grid{display:grid;gap:10px}.status{margin:10px 0;color:var(--green2);font-size:13px}@media(max-width:800px){.grid{grid-template-columns:1fr}.topin{padding:10px 0}.prices{grid-template-columns:1fr 1fr}.wrap{width:min(94%,650px)}}
+</style>
+</head>
+<body>
+<section id="login" class="login"><div class="card login-card"><div class="logo">RESTAURANT PLATFORM</div><h1>Staff Login</h1><p class="sub">Sign in with the Firebase staff account created for you.</p><form id="loginForm"><div class="field"><label>Email</label><input id="email" type="email" autocomplete="username" required></div><div class="field"><label>Password</label><input id="password" type="password" autocomplete="current-password" required></div><div id="loginError" class="error"></div><button class="btn primary" style="width:100%">Login</button></form></div></section>
+<section id="app" class="hidden"><header class="top"><div class="wrap topin"><div><div id="restaurantName" class="logo">Restaurant Dashboard</div><div id="who" class="sub">Staff Dashboard</div></div><button id="logout" class="btn secondary">Logout</button></div></header><main class="wrap"><div id="adminChooser" class="card section hidden"><h2>Select Restaurant</h2><div class="field"><label>Restaurant</label><select id="restaurantSelect" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:#07100a;color:#fff"></select></div></div><div id="status" class="status"></div><div class="grid"><section class="card section"><h2>Restaurant Info</h2><form id="restaurantForm"><div class="info-grid" id="restaurantFields"></div><div class="actions"><button class="btn primary">Save Restaurant</button></div></form></section><section class="card section"><h2>Menu</h2><div class="search"><input id="search" placeholder="Search menu items..."></div><div id="menu" class="menu"></div></section></div></main></section>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js";
+import {getFirestore,doc,getDoc,collection,getDocs,query,orderBy,updateDoc} from "https://www.gstatic.com/firebasejs/12.3.0/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyC_YB9MJsDMrrkuhRW9aA_hQUUseeos9Nc",authDomain:"restaurants-platform-5ecfc.firebaseapp.com",projectId:"restaurants-platform-5ecfc",storageBucket:"restaurants-platform-5ecfc.firebasestorage.app",messagingSenderId:"818331453802",appId:"1:818331453802:web:937965ccc1ec6ae1797d13",measurementId:"G-JF3YV39TRP"};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);let restaurantId=null,items=[],currentProfile=null;
+const $=id=>document.getElementById(id); const setStatus=x=>$("status").textContent=x||"";
+function field(label,key,value,type="text"){return `<div class="field"><label>${label}</label><input data-key="${key}" value="${String(value??"").replaceAll('&','&amp;').replaceAll('"','&quot;') }" type="${type}"></div>`}
+async function loadDashboard(user){
+ const u=await getDoc(doc(db,"users",user.uid)); if(!u.exists()) throw new Error("Your staff profile is missing in Firestore.");
+ const p=u.data(); if(!["restaurant_owner","restaurant_staff","super_admin"].includes(p.role)) throw new Error("This account is not authorized for the dashboard.");
+ currentProfile=p;
+ if(p.role==="super_admin"){
+   const rs=await getDocs(collection(db,"restaurants"));
+   const list=rs.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(a.name||a.id).localeCompare(b.name||b.id));
+   $("restaurantSelect").innerHTML=list.map(x=>`<option value="${x.id}">${x.name||x.id}</option>`).join("");
+   if(!list.length) throw new Error("No restaurants have been added yet.");
+   restaurantId=p.restaurantId && list.some(x=>x.id===p.restaurantId) ? p.restaurantId : list[0].id;
+   $("restaurantSelect").value=restaurantId;
+   $("adminChooser").classList.remove("hidden");
+ }else{
+   restaurantId=p.restaurantId;
+   if(!restaurantId) throw new Error("Your staff profile has no restaurantId.");
+   $("adminChooser").classList.add("hidden");
+ }
+ await loadRestaurant();
+ $("login").classList.add("hidden"); $("app").classList.remove("hidden");
+}
+async function loadRestaurant(){
+ const r=await getDoc(doc(db,"restaurants",restaurantId)); if(!r.exists()) throw new Error("Restaurant record not found: "+restaurantId);
+ const d=r.data(); $("restaurantName").textContent=d.name||restaurantId; $("restaurantFields").innerHTML=[field("Restaurant name","name",d.name),field("WhatsApp","whatsapp",d.whatsapp),field("Second WhatsApp","whatsapp2",d.whatsapp2),field("Address","address",d.address),field("Facebook","facebook",d.facebook),field("TikTok","tiktok",d.tiktok)].join("");
+ const snap=await getDocs(query(collection(db,"restaurants",restaurantId,"menuItems"),orderBy("name"))); items=snap.docs.map(x=>({id:x.id,...x.data()})); render(); $("who").textContent=`${currentProfile.role} • ${restaurantId}`;
+}
+function priceRows(prices){if(!prices||typeof prices!=="object")return `<div class="sub">Price: on request</div>`;return `<div class="prices">${Object.entries(prices).map(([k,v])=>`<div class="edit"><label class="sub">${k}</label><input data-price="${k}" type="number" min="0" value="${v}"></div>`).join("")}</div>`}
+function render(){const q=$("search").value.trim().toLowerCase();$("menu").innerHTML=items.filter(x=>(x.name||"").toLowerCase().includes(q)).map(x=>`<article class="item"><div class="itemhead"><div><div class="itemname">${x.name||x.id}</div><div class="sub">${x.categoryId||""}</div></div><span class="badge ${x.isActive===false?'off':''}">${x.isActive===false?'Hidden':'Active'}</span></div>${priceRows(x.prices)}<div class="actions"><button class="btn primary" data-save="${x.id}">Save</button><button class="btn secondary" data-toggle="${x.id}">${x.isActive===false?'Show':'Hide'}</button></div></article>`).join("")||`<div class="sub">No items found.</div>`;}
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();$("loginError").textContent="";try{await signInWithEmailAndPassword(auth,$("email").value.trim(),$("password").value)}catch(err){$("loginError").textContent=err.code?.replace("auth/","")||err.message}});
+$("logout").onclick=()=>signOut(auth); $("search").oninput=render;
+$("restaurantSelect").addEventListener("change",async e=>{if(currentProfile?.role!=="super_admin")return;restaurantId=e.target.value;try{await loadRestaurant();setStatus("Restaurant loaded.");}catch(err){setStatus("Load failed: "+err.message);}});
+$("restaurantForm").addEventListener("submit",async e=>{e.preventDefault();try{const data={};$("restaurantFields").querySelectorAll("input").forEach(i=>data[i.dataset.key]=i.value.trim());await updateDoc(doc(db,"restaurants",restaurantId),data);setStatus("Restaurant information saved.");}catch(err){setStatus("Save failed: "+err.message)}});
+$("menu").addEventListener("click",async e=>{const save=e.target.closest("[data-save]"),toggle=e.target.closest("[data-toggle]");const id=save?.dataset.save||toggle?.dataset.toggle;if(!id)return;const item=items.find(x=>x.id===id);try{if(toggle){await updateDoc(doc(db,"restaurants",restaurantId,"menuItems",id),{isActive:item.isActive===false});item.isActive=item.isActive===false;}else{const prices={};e.target.closest(".item").querySelectorAll("[data-price]").forEach(i=>prices[i.dataset.price]=Number(i.value));await updateDoc(doc(db,"restaurants",restaurantId,"menuItems",id),{prices});item.prices=prices;}render();setStatus("Menu updated.");}catch(err){setStatus("Update failed: "+err.message)}});
+onAuthStateChanged(auth,async user=>{if(!user){$("login").classList.remove("hidden");$("app").classList.add("hidden");return}try{await loadDashboard(user)}catch(err){await signOut(auth);$("login").classList.remove("hidden");$("app").classList.add("hidden");$("loginError").textContent=err.message}});
+</script>
+</body></html>
